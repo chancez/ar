@@ -2,6 +2,7 @@
 
 #include <ar.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -13,22 +14,70 @@
 
 #define BLOCKSIZE 1
 
+int write_header(int ar_fd, int in_fd) {
+    struct stat st;
+    fstat(in_fd, &st);
+
+}
+
+int write_armag(int fd, char* filename) {
+    char buf[] = ARMAG;
+    int written;
+    written = write(fd, buf, SARMAG);
+    if (written != SARMAG) {
+        perror("Error while writing ARMAG header");
+        unlink(filename);
+        exit(-1);
+    }
+}
+
 int ar_append(int index, int argc, char **argv)
 {
-    int in_fd;
-    int flags = O_RDWR | O_CREAT;
+    int in_fd, ar_fd;
+    int flags = O_RDWR;
     int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
     char buf[BLOCKSIZE];
     struct stat st;
-    int num_read;
+    int num_read, num_written;
     int total_read;
+    int result;
 
-    while (index < argc) {
-        in_fd = open(argv[index], flags, mode);
-        if (in_fd == -1) {
-            perror("Cannot open archive file");
+    if ((argc - index) < 2)
+        printf("Error, must provide at least 2 args\n");
+
+    char *archive_name = argv[index];
+    index++;
+    // try opening without creation
+    ar_fd = open(archive_name, flags, mode);
+    if (ar_fd == -1) {
+        // Doesn't exist, lets re-open it with the create flag
+        if (errno == ENOENT) {
+            flags |= O_CREAT;
+            ar_fd = open(archive_name, flags, mode);
+        }
+        if (ar_fd == -1) {
+            printf("Error, unable to open or create archive file %s.", archive_name);
             exit(-1);
         }
+    } else {
+        // Does exist, lets set the append flag.
+        if (fcntl(ar_fd, F_SETFL, O_APPEND) == -1) {
+            perror("Error setting O_APPEND flag on file\n");
+            exit(-1);
+        }
+    }
+    //flags = fcntl(ar_fd, F_GETFL);
+    printf("flags=%d\n", flags & O_CREAT);
+    if (flags == -1) {
+        perror("Error checking flags on archive file\n");
+    } else if (flags & O_CREAT) {
+        printf("O_CREATE was set\n");
+        // Didnt already exist, so we need to write the ARMAG header
+        write_armag(ar_fd, archive_name);
+    }
+    return 0;
+    while (index < argc) {
+        in_fd = open(argv[index], O_RDONLY);
         fstat(in_fd, &st);
         total_read = 0;
         while (total_read < st.st_size) {
@@ -37,10 +86,9 @@ int ar_append(int index, int argc, char **argv)
                 perror("Error reading file");
                 exit(-1);
             }
+            result = write_header(ar_fd, in_fd);
             total_read += num_read;
-            printf("%c", buf[0]);
         }
-
         index++;
     }
 
