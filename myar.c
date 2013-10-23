@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <ar.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -8,27 +10,50 @@
 #include <stdio.h>
 #include <unistd.h>
 
+int ar_append(int index, int argc, char **argv)
+{
+    while (index < argc) {
+        printf ("Non-option argument %s\n", argv[index]);
+        index++;
+    }
+    return 0;
+
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
-    int aflag = 0;
-    int bflag = 0;
-    char *cvalue = NULL;
-    int index;
+    extern char *optarg;
+    extern int optind, opterr, optopt;
+
+    int v_flag = 0;
+    int q_flag = 0;
+    int x_flag = 0;
+    int t_flag = 0;
+    int d_flag = 0;
+    int A_flag = 0;
     int c;
 
-    int opterr = 0;
-
-    while ((c = getopt(argc, argv, "abc:")) != -1)
+    while ((c = getopt(argc, argv, "vqxtdA")) != -1) {
         switch (c)
         {
-        case 'a':
-            aflag = 1;
+        case 'q':
+            q_flag = 1;
             break;
-        case 'b':
-            bflag = 1;
+        case 'v':
+            v_flag = 1;
             break;
-        case 'c':
-            cvalue = optarg;
+        case 'x':
+            x_flag = 1;
+            break;
+        case 't':
+            t_flag = 1;
+            break;
+        case 'd':
+            d_flag = 1;
+            break;
+        case 'A':
+            A_flag = 1;
             break;
         case '?':
             if (optopt == 'c')
@@ -43,12 +68,11 @@ int main(int argc, char **argv)
         default:
             abort();
         }
+    }
 
-    printf ("aflag = %d, bflag = %d, cvalue = %s\n",
-            aflag, bflag, cvalue);
-
-    for (index = optind; index < argc; index++)
-        printf ("Non-option argument %s\n", argv[index]);
-    return 0;
+    if (q_flag) {
+        ar_append(optind, argc, argv);
+    }
 
 }
+

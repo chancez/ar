@@ -4,7 +4,7 @@ ifeq "$(ERR)" "0"
 else
 	CC=gcc
 endif
-CFLAGS=-Wall
+CFLAGS=-std=c99 -Wall -g
 
 PROGRAM=myar
 SOURCES=myar.c
