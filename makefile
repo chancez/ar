@@ -7,7 +7,8 @@ endif
 CFLAGS=-std=c99 -Wall -g
 
 PROGRAM=myar
-SOURCES=myar.c
+SOURCES=myar.c file_stat.c
+INCLUDES=file_stat.h
 
 SRC	:= $(shell egrep -l '^[^%]*\\begin\{document\}' *.tex)
 TRG	= $(SRC:%.tex=%.dvi)
@@ -38,5 +39,5 @@ $(PSF): %.ps : %.dvi
 $(PDF): %.pdf : %.ps
 	ps2pdf $<
 
-$(PROGRAM): $(SOURCES)
-	$(CC) $(CFLAGS) $< -o $@
+$(PROGRAM): $(SOURCES) $(INCLUDES)
+	$(CC) $(CFLAGS) $(SOURCES) -o $@
