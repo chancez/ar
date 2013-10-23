@@ -4,19 +4,45 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 
+#define BLOCKSIZE 1
+
 int ar_append(int index, int argc, char **argv)
 {
+    int in_fd;
+    int flags = O_RDWR | O_CREAT;
+    int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+    char buf[BLOCKSIZE];
+    struct stat st;
+    int num_read;
+    int total_read;
+
     while (index < argc) {
-        printf ("Non-option argument %s\n", argv[index]);
+        in_fd = open(argv[index], flags, mode);
+        if (in_fd == -1) {
+            perror("Cannot open archive file");
+            exit(-1);
+        }
+        fstat(in_fd, &st);
+        total_read = 0;
+        while (total_read < st.st_size) {
+            num_read = read(in_fd, buf, BLOCKSIZE);
+            if (num_read == -1) {
+                perror("Error reading file");
+                exit(-1);
+            }
+            total_read += num_read;
+            printf("%c", buf[0]);
+        }
+
         index++;
     }
-    return 0;
 
     return 1;
 }
