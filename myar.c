@@ -34,7 +34,7 @@ int write_armag(int fd, char* filename) {
 int ar_append(int index, int argc, char **argv)
 {
     int in_fd, ar_fd;
-    int flags = O_RDWR;
+    int flags = O_RDWR | O_APPEND;
     int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
     char buf[BLOCKSIZE];
     struct stat st;
@@ -46,6 +46,7 @@ int ar_append(int index, int argc, char **argv)
         printf("Error, must provide at least 2 args\n");
 
     char *archive_name = argv[index];
+    // Increment our index because we will be working on the non archive files next.
     index++;
     // try opening without creation
     ar_fd = open(archive_name, flags, mode);
@@ -59,19 +60,10 @@ int ar_append(int index, int argc, char **argv)
             printf("Error, unable to open or create archive file %s.", archive_name);
             exit(-1);
         }
-    } else {
-        // Does exist, lets set the append flag.
-        if (fcntl(ar_fd, F_SETFL, O_APPEND) == -1) {
-            perror("Error setting O_APPEND flag on file\n");
-            exit(-1);
-        }
     }
-    //flags = fcntl(ar_fd, F_GETFL);
-    printf("flags=%d\n", flags & O_CREAT);
     if (flags == -1) {
         perror("Error checking flags on archive file\n");
     } else if (flags & O_CREAT) {
-        printf("O_CREATE was set\n");
         // Didnt already exist, so we need to write the ARMAG header
         write_armag(ar_fd, archive_name);
     }
