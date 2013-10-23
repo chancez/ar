@@ -47,6 +47,28 @@
 
 \maketitle
 
-test
+\section{Design}
+
+For the ar program I plan on separating out each key into a function, where all
+the logic for creating an archive will just be a composition of re-usable
+functions.
+
+There are two types of functions needed for AR. The first is a function which
+accepts the list of file names passed to the program, which will be used for
+options -q, -x, -d, -t, which are all used with a list of file names on the
+command line. The other options -A and -v will be acting slightly different,
+where the -A will be passed a list of files, but it wont be a list from the
+command line, and -v will be working with an existing flag, which will likely
+deal with disabling suppressing output of commands.
+
+With this in mind, almost all of my ar options will be acting on a list of file
+names, so I will be designing my functions to work this way. I'll begin with -q
+so I can create an archive and test its output. The rest should simply deal
+with reading the ar data structure and parsing the ar header data. That should
+also be trivial. I will be able to read text from the archive until reaching
+the ARMAG constants, which will let me iteratively go through the file and
+either print the -t contents, delete files using -d or extract files using -x.
+All of those will be very similar, so I will likely have utility functions for
+reading the file until the ARMAG constants and parsing the ar header data.
 
 \end{document}
