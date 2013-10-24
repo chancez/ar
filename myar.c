@@ -28,13 +28,13 @@ void make_ar_hdr(struct ar_hdr *header, struct stat st, char *file_name)
     snprintf(header->ar_gid, sizeof(header->ar_gid)/sizeof(char), "%u", st.st_gid);
     snprintf(header->ar_mode, sizeof(header->ar_mode)/sizeof(char), "%o", st.st_mode);
     snprintf(header->ar_size, sizeof(header->ar_size)/sizeof(char), "%lu", st.st_size);
-    strncpy(header->ar_fmag, ARFMAG, sizeof(ARFMAG)/sizeof(char));
+    snprintf(header->ar_fmag, sizeof(ARFMAG)/sizeof(char), "%s", ARFMAG);
 }
 
 void write_ar_header(int ar_fd, struct stat st, char* file_name)
 {
     struct ar_hdr *header = (struct ar_hdr*)malloc(AR_HDR_SIZE);
-    char *buffer = (char*)malloc(AR_HDR_SIZE);
+    char buffer[AR_HDR_SIZE+1];
     int num_written;
     // Create the ar_header given the stat struct and file name.
     make_ar_hdr(header, st, file_name);
@@ -42,23 +42,38 @@ void write_ar_header(int ar_fd, struct stat st, char* file_name)
     sprintf(buffer, "%-15s%-12s%-6s%-6s%-8s%-10s%-2s",
         header->ar_name, header->ar_date, header->ar_uid, header->ar_gid,
         header->ar_mode, header->ar_size, header->ar_fmag);
+
     // write our buffer to the archive file
-    num_written = write(ar_fd, buffer, AR_HDR_SIZE);
+    num_written = write(ar_fd, buffer, AR_HDR_SIZE-1);
     if (num_written == -1) {
         perror("Unable to write to archive file");
         unlink(file_name);
         exit(-1);
     }
     free(header);
-    free(buffer);
 }
 
-int ar_write_contents(int ar_fd, char *buffer, int amount) {
+int write_ar_content(int ar_fd, int in_fd, struct stat st, char *file_name) {
+    int total_read = 0, total_written = 0, num_written = 0, num_read = 0;
+    char buf[BLOCKSIZE];
 
+    while (total_read < st.st_size) {
+        num_read = read(in_fd, buf, BLOCKSIZE);
+        num_written = write(ar_fd, buf, BLOCKSIZE);
+        if (num_read != num_written) {
+            perror("Error writing file");
+            unlink(file_name);
+            exit(-1);
+        }
+        total_read += num_read;
+        total_written += num_written;
+    }
+    if (total_written % 2)
+        write(ar_fd, "\n", 1);
     return 0;
 }
 
-int write_armag(int fd, char* filename) {
+void write_armag(int fd, char* filename) {
     char buf[] = ARMAG;
     int written;
     written = write(fd, buf, SARMAG);
@@ -98,10 +113,7 @@ int ar_open_append(char *archive_name)
 int ar_append(int index, int argc, char **argv)
 {
     int in_fd, ar_fd;
-    char buf[BLOCKSIZE];
     struct stat st;
-    int num_read, num_written;
-    int total_read;
 
     if ((argc - index) < 2) {
         printf("Error, must provide at least 2 args\n");
@@ -126,22 +138,19 @@ int ar_append(int index, int argc, char **argv)
         }
         // We've got the stat struct, lets write the ar_hdr
         write_ar_header(ar_fd, st, argv[index]);
-
-        // Begin copying file contents to the archive.
-        total_read = 0;
-        while (total_read < st.st_size) {
-            num_read = read(in_fd, buf, BLOCKSIZE);
-            if (num_read == -1) {
-                perror("Error reading file");
-                exit(-1);
-            }
-            total_read += num_read;
-            //num_written = ar_write_contents(ar_fd, buf, num_read);
-        }
+        write_ar_content(ar_fd, in_fd, st, argv[index]);
         index++;
+        if (close(in_fd) == -1) {
+            perror("Unable to close input file");
+            exit(-1);
+        }
+    }
+    if (close(ar_fd) == -1) {
+        perror("Unable to close archive file");
+        exit(-1);
     }
 
-    return 1;
+    return 0;
 }
 
 int main(int argc, char **argv)
