@@ -20,6 +20,30 @@
 
 #define AR_HDR_SIZE sizeof(struct ar_hdr)
 
+void ar_contents(int index, int argc, char **argv)
+{
+    if ((argc - index) < 1) {
+        printf("Error no archive file specified!\n");
+        exit(-1);
+    }
+    char *archive_name = argv[index];
+    int ar_fd;
+    int num_read;
+
+    char buf[AR_HDR_SIZE];
+
+    ar_fd = open(archive_name, O_RDONLY);
+    if (ar_fd == -1) {
+        perror("Error");
+        exit(-1);
+    }
+    num_read = read(ar_fd, buf, SARMAG);
+    if (strncmp(ARMAG, buf, SARMAG) != 0) {
+        printf("%s: file format not recognized\n", archive_name);
+        exit(-1);
+    }
+}
+
 void make_ar_hdr(struct ar_hdr *header, struct stat st, char *file_name)
 {
     strncpy(header->ar_name, file_name, sizeof(header->ar_name)/sizeof(char));
@@ -34,6 +58,7 @@ void make_ar_hdr(struct ar_hdr *header, struct stat st, char *file_name)
 void write_ar_header(int ar_fd, struct stat st, char* file_name)
 {
     struct ar_hdr *header = (struct ar_hdr*)malloc(AR_HDR_SIZE);
+    // Need space for NULL
     char buffer[AR_HDR_SIZE+1];
     int num_written;
     // Create the ar_header given the stat struct and file name.
@@ -44,7 +69,7 @@ void write_ar_header(int ar_fd, struct stat st, char* file_name)
         header->ar_mode, header->ar_size, header->ar_fmag);
 
     // write our buffer to the archive file
-    num_written = write(ar_fd, buffer, AR_HDR_SIZE-1);
+    num_written = write(ar_fd, buffer, AR_HDR_SIZE-1); // Dont write NULL
     if (num_written == -1) {
         perror("Unable to write to archive file");
         unlink(file_name);
@@ -68,7 +93,7 @@ int write_ar_content(int ar_fd, int in_fd, struct stat st, char *file_name) {
         total_read += num_read;
         total_written += num_written;
     }
-    if (total_written % 2)
+    if (total_written % 2) // Even byte alignment
         write(ar_fd, "\n", 1);
     return 0;
 }
@@ -204,6 +229,9 @@ int main(int argc, char **argv)
 
     if (q_flag) {
         ar_append(optind, argc, argv);
+    }
+    if (t_flag) {
+        ar_contents(optind, argc, argv);
     }
 
 }
