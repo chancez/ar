@@ -46,7 +46,7 @@ void ar_contents(int index, int argc, char **argv)
 
 void make_ar_hdr(struct ar_hdr *header, struct stat st, char *file_name)
 {
-    strncpy(header->ar_name, file_name, sizeof(header->ar_name)/sizeof(char));
+    snprintf(header->ar_name, sizeof(header->ar_name)/sizeof(char), "%s", file_name);
     snprintf(header->ar_date, sizeof(header->ar_date)/sizeof(char), "%lu", st.st_mtime);
     snprintf(header->ar_uid, sizeof(header->ar_uid)/sizeof(char), "%u", st.st_uid);
     snprintf(header->ar_gid, sizeof(header->ar_gid)/sizeof(char), "%u", st.st_gid);
@@ -59,17 +59,18 @@ void write_ar_header(int ar_fd, struct stat st, char* file_name)
 {
     struct ar_hdr *header = (struct ar_hdr*)malloc(AR_HDR_SIZE);
     // Need space for NULL
-    char buffer[AR_HDR_SIZE+1];
+    char buffer[AR_HDR_SIZE];
     int num_written;
     // Create the ar_header given the stat struct and file name.
     make_ar_hdr(header, st, file_name);
+
     // Store it in our buffer
-    sprintf(buffer, "%-15s%-12s%-6s%-6s%-8s%-10s%-2s",
+    sprintf(buffer, "%-16s%-12s%-6s%-6s%-8s%-10s%-2s",
         header->ar_name, header->ar_date, header->ar_uid, header->ar_gid,
         header->ar_mode, header->ar_size, header->ar_fmag);
 
     // write our buffer to the archive file
-    num_written = write(ar_fd, buffer, AR_HDR_SIZE-1); // Dont write NULL
+    num_written = write(ar_fd, buffer, AR_HDR_SIZE); // Dont write NULL
     if (num_written == -1) {
         perror("Unable to write to archive file");
         unlink(file_name);
