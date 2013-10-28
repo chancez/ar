@@ -62,38 +62,43 @@ void read_contents(int index, int argc, char **argv)
             exit(-1);
         }
         total_read += num_read;
+        char tmp[AR_HDR_SIZE];
+        sprintf(tmp, "%s", header.ar_name);
+        printf("%s", tmp);
         return;
     }
 }
 
-void ar_header(struct ar_hdr *header, struct stat st, char *file_name)
+struct ar_hdr ar_header(struct stat st, char *file_name)
 {
-    snprintf(header->ar_name, sizeof(header->ar_name)/sizeof(char), "%s", file_name);
-    snprintf(header->ar_date, sizeof(header->ar_date)/sizeof(char), "%lu", st.st_mtime);
-    snprintf(header->ar_uid, sizeof(header->ar_uid)/sizeof(char), "%u", st.st_uid);
-    snprintf(header->ar_gid, sizeof(header->ar_gid)/sizeof(char), "%u", st.st_gid);
-    snprintf(header->ar_mode, sizeof(header->ar_mode)/sizeof(char), "%o", st.st_mode);
-    snprintf(header->ar_size, sizeof(header->ar_size)/sizeof(char), "%lu", st.st_size);
-    snprintf(header->ar_fmag, sizeof(ARFMAG)/sizeof(char), "%s", ARFMAG);
+    struct ar_hdr header;
+    snprintf(header.ar_name, sizeof(header.ar_name)/sizeof(char), "%s", file_name);
+    snprintf(header.ar_date, sizeof(header.ar_date)/sizeof(char), "%lu", st.st_mtime);
+    snprintf(header.ar_uid, sizeof(header.ar_uid)/sizeof(char), "%u", st.st_uid);
+    snprintf(header.ar_gid, sizeof(header.ar_gid)/sizeof(char), "%u", st.st_gid);
+    snprintf(header.ar_mode, sizeof(header.ar_mode)/sizeof(char), "%o", st.st_mode);
+    snprintf(header.ar_size, sizeof(header.ar_size)/sizeof(char), "%lu", st.st_size);
+    snprintf(header.ar_fmag, sizeof(ARFMAG)/sizeof(char), "%s", ARFMAG);
     /*
     snprintf(header, sizeof(AR_HDR_SIZE), "%s%lu%u%u%o%lu%s",
         st.st_mtime, st.st_mtime, st.st_uid, st.st_gid,
         st.st_mode, st.st_size, ARFMAG);
     */
+    return header;
 }
 
 void write_header(int ar_fd, struct stat st, char* file_name)
 {
-    struct ar_hdr *header = (struct ar_hdr*)malloc(AR_HDR_SIZE);
+    struct ar_hdr header;
     char buffer[AR_HDR_SIZE];
     int num_written;
     // Create the ar_header given the stat struct and file name.
-    ar_header(header, st, file_name);
+    header = ar_header(st, file_name);
 
     // Store it in our buffer
     sprintf(buffer, "%-16s%-12s%-6s%-6s%-8s%-10s%-2s",
-        header->ar_name, header->ar_date, header->ar_uid, header->ar_gid,
-        header->ar_mode, header->ar_size, header->ar_fmag);
+        header.ar_name, header.ar_date, header.ar_uid, header.ar_gid,
+        header.ar_mode, header.ar_size, header.ar_fmag);
 
     // write our buffer to the archive file
     num_written = write(ar_fd, buffer, AR_HDR_SIZE);
@@ -102,7 +107,6 @@ void write_header(int ar_fd, struct stat st, char* file_name)
         unlink(file_name);
         exit(-1);
     }
-    free(header);
 }
 
 int write_contents(int ar_fd, int in_fd, struct stat st, char *file_name) {
