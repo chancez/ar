@@ -20,7 +20,7 @@
 
 #define AR_HDR_SIZE sizeof(struct ar_hdr)
 
-void ar_contents(int index, int argc, char **argv)
+void ar_read_contents(int index, int argc, char **argv)
 {
     if ((argc - index) < 1) {
         printf("Error no archive file specified!\n");
@@ -28,19 +28,41 @@ void ar_contents(int index, int argc, char **argv)
     }
     char *archive_name = argv[index];
     int ar_fd;
-    int num_read;
+    int num_read = 0, total_read = 0;
+    struct stat st;
+    struct ar_hdr header;
+    int accum, size;
 
-    char buf[AR_HDR_SIZE];
+    char buf[SARMAG];
 
     ar_fd = open(archive_name, O_RDONLY);
     if (ar_fd == -1) {
         perror("Error");
         exit(-1);
     }
+    // Read only up to SARMAG so we fill our buffer with ARMAG
     num_read = read(ar_fd, buf, SARMAG);
+    if (num_read == -1) {
+        perror("Error reading file");
+        exit(-1);
+    }
+    // Check for our armag header in the buffer otherwise invalid file type
     if (strncmp(ARMAG, buf, SARMAG) != 0) {
         printf("%s: file format not recognized\n", archive_name);
         exit(-1);
+    }
+    if (fstat(ar_fd, &st) == -1) {
+        perror("Error trying to stat file");
+    }
+
+    while (total_read < st.st_size) {
+        num_read = read(ar_fd, &header, AR_HDR_SIZE);
+        if (num_read == -1) {
+            perror("Error reading file");
+            exit(-1);
+        }
+        total_read += num_read;
+        return;
     }
 }
 
@@ -53,12 +75,16 @@ void make_ar_hdr(struct ar_hdr *header, struct stat st, char *file_name)
     snprintf(header->ar_mode, sizeof(header->ar_mode)/sizeof(char), "%o", st.st_mode);
     snprintf(header->ar_size, sizeof(header->ar_size)/sizeof(char), "%lu", st.st_size);
     snprintf(header->ar_fmag, sizeof(ARFMAG)/sizeof(char), "%s", ARFMAG);
+    /*
+    snprintf(header, sizeof(AR_HDR_SIZE), "%s%lu%u%u%o%lu%s",
+        st.st_mtime, st.st_mtime, st.st_uid, st.st_gid,
+        st.st_mode, st.st_size, ARFMAG);
+    */
 }
 
 void write_ar_header(int ar_fd, struct stat st, char* file_name)
 {
     struct ar_hdr *header = (struct ar_hdr*)malloc(AR_HDR_SIZE);
-    // Need space for NULL
     char buffer[AR_HDR_SIZE];
     int num_written;
     // Create the ar_header given the stat struct and file name.
@@ -70,7 +96,7 @@ void write_ar_header(int ar_fd, struct stat st, char* file_name)
         header->ar_mode, header->ar_size, header->ar_fmag);
 
     // write our buffer to the archive file
-    num_written = write(ar_fd, buffer, AR_HDR_SIZE); // Dont write NULL
+    num_written = write(ar_fd, buffer, AR_HDR_SIZE);
     if (num_written == -1) {
         perror("Unable to write to archive file");
         unlink(file_name);
@@ -232,7 +258,7 @@ int main(int argc, char **argv)
         ar_append(optind, argc, argv);
     }
     if (t_flag) {
-        ar_contents(optind, argc, argv);
+        ar_read_contents(optind, argc, argv);
     }
 
 }
