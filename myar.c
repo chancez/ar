@@ -20,7 +20,7 @@
 
 #define AR_HDR_SIZE sizeof(struct ar_hdr)
 
-void ar_read_contents(int index, int argc, char **argv)
+void read_contents(int index, int argc, char **argv)
 {
     if ((argc - index) < 1) {
         printf("Error no archive file specified!\n");
@@ -66,7 +66,7 @@ void ar_read_contents(int index, int argc, char **argv)
     }
 }
 
-void make_ar_hdr(struct ar_hdr *header, struct stat st, char *file_name)
+void ar_header(struct ar_hdr *header, struct stat st, char *file_name)
 {
     snprintf(header->ar_name, sizeof(header->ar_name)/sizeof(char), "%s", file_name);
     snprintf(header->ar_date, sizeof(header->ar_date)/sizeof(char), "%lu", st.st_mtime);
@@ -82,13 +82,13 @@ void make_ar_hdr(struct ar_hdr *header, struct stat st, char *file_name)
     */
 }
 
-void write_ar_header(int ar_fd, struct stat st, char* file_name)
+void write_header(int ar_fd, struct stat st, char* file_name)
 {
     struct ar_hdr *header = (struct ar_hdr*)malloc(AR_HDR_SIZE);
     char buffer[AR_HDR_SIZE];
     int num_written;
     // Create the ar_header given the stat struct and file name.
-    make_ar_hdr(header, st, file_name);
+    ar_header(header, st, file_name);
 
     // Store it in our buffer
     sprintf(buffer, "%-16s%-12s%-6s%-6s%-8s%-10s%-2s",
@@ -105,7 +105,7 @@ void write_ar_header(int ar_fd, struct stat st, char* file_name)
     free(header);
 }
 
-int write_ar_content(int ar_fd, int in_fd, struct stat st, char *file_name) {
+int write_contents(int ar_fd, int in_fd, struct stat st, char *file_name) {
     int total_read = 0, total_written = 0, num_written = 0, num_read = 0;
     char buf[BLOCKSIZE];
 
@@ -136,7 +136,7 @@ void write_armag(int fd, char* filename) {
     }
 }
 
-int ar_open_append(char *archive_name)
+int open_archive(char *archive_name)
 {
     int ar_fd;
     int flags = O_RDWR | O_APPEND;
@@ -162,7 +162,7 @@ int ar_open_append(char *archive_name)
     return ar_fd;
 }
 
-int ar_append(int index, int argc, char **argv)
+int append(int index, int argc, char **argv)
 {
     int in_fd, ar_fd;
     struct stat st;
@@ -177,7 +177,7 @@ int ar_append(int index, int argc, char **argv)
     index++;
 
     // Open the ar file and put the ARMAG string in if its a new file.
-    ar_fd = ar_open_append(archive_name);
+    ar_fd = open_archive(archive_name);
     if (ar_fd == -1) {
         perror("Error opening file");
     }
@@ -189,8 +189,8 @@ int ar_append(int index, int argc, char **argv)
             exit(-1);
         }
         // We've got the stat struct, lets write the ar_hdr
-        write_ar_header(ar_fd, st, argv[index]);
-        write_ar_content(ar_fd, in_fd, st, argv[index]);
+        write_header(ar_fd, st, argv[index]);
+        write_contents(ar_fd, in_fd, st, argv[index]);
         index++;
         if (close(in_fd) == -1) {
             perror("Unable to close input file");
@@ -255,10 +255,10 @@ int main(int argc, char **argv)
     }
 
     if (q_flag) {
-        ar_append(optind, argc, argv);
+        append(optind, argc, argv);
     }
     if (t_flag) {
-        ar_read_contents(optind, argc, argv);
+        read_contents(optind, argc, argv);
     }
 
 }
