@@ -28,12 +28,12 @@ void read_contents(int index, int argc, char **argv)
     }
     char *archive_name = argv[index];
     int ar_fd;
-    int num_read = 0, total_read = 0;
+    int num_read = 0, position = 0, offset = 0;
     struct stat st;
     struct ar_hdr header;
-    int accum, size;
-
-    char buf[SARMAG];
+    int size;
+    char tmp[AR_HDR_SIZE];
+    char buf[17];
 
     ar_fd = open(archive_name, O_RDONLY);
     if (ar_fd == -1) {
@@ -55,30 +55,37 @@ void read_contents(int index, int argc, char **argv)
         perror("Error trying to stat file");
     }
 
-    while (total_read < st.st_size) {
+    while (position <= st.st_size-1) {
+        // Read the header into our struct
         num_read = read(ar_fd, &header, AR_HDR_SIZE);
         if (num_read == -1) {
             perror("Error reading file");
             exit(-1);
         }
-        total_read += num_read;
-        char tmp[AR_HDR_SIZE];
-        sprintf(tmp, "%s", header.ar_name);
-        printf("%s", tmp);
-        return;
+        size = atoi(header.ar_size);
+        // Even byte alignment check
+        if (size % 2)
+            offset = 1;
+        else
+            offset = 0;
+
+        snprintf(buf, sizeof(header.ar_name), "%s", header.ar_name);
+        printf("%s\n", buf);
+        position = lseek(ar_fd, size+offset, SEEK_CUR);
+
     }
 }
 
 struct ar_hdr ar_header(struct stat st, char *file_name)
 {
     struct ar_hdr header;
-    snprintf(header.ar_name, sizeof(header.ar_name)/sizeof(char), "%s", file_name);
-    snprintf(header.ar_date, sizeof(header.ar_date)/sizeof(char), "%lu", st.st_mtime);
-    snprintf(header.ar_uid, sizeof(header.ar_uid)/sizeof(char), "%u", st.st_uid);
-    snprintf(header.ar_gid, sizeof(header.ar_gid)/sizeof(char), "%u", st.st_gid);
-    snprintf(header.ar_mode, sizeof(header.ar_mode)/sizeof(char), "%o", st.st_mode);
-    snprintf(header.ar_size, sizeof(header.ar_size)/sizeof(char), "%lu", st.st_size);
-    snprintf(header.ar_fmag, sizeof(ARFMAG)/sizeof(char), "%s", ARFMAG);
+    snprintf(header.ar_name, sizeof(header.ar_name), "%s", file_name);
+    snprintf(header.ar_date, sizeof(header.ar_date), "%lu", st.st_mtime);
+    snprintf(header.ar_uid, sizeof(header.ar_uid), "%u", st.st_uid);
+    snprintf(header.ar_gid, sizeof(header.ar_gid), "%u", st.st_gid);
+    snprintf(header.ar_mode, sizeof(header.ar_mode), "%o", st.st_mode);
+    snprintf(header.ar_size, sizeof(header.ar_size), "%lu", st.st_size);
+    snprintf(header.ar_fmag, sizeof(ARFMAG), "%s", ARFMAG);
     /*
     snprintf(header, sizeof(AR_HDR_SIZE), "%s%lu%u%u%o%lu%s",
         st.st_mtime, st.st_mtime, st.st_uid, st.st_gid,
