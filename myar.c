@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <utime.h>
 #include <unistd.h>
 
 #include "file_stat.h"
@@ -20,7 +21,75 @@
 
 #define AR_HDR_SIZE sizeof(struct ar_hdr)
 
-void read_contents(int index, int argc, char **argv)
+void print_table(struct ar_hdr header, int verbose)
+{
+    char buf[17];
+    snprintf(buf, sizeof(header.ar_name), "%s", header.ar_name);
+    printf("%s\n", buf);
+}
+
+void extract(int ar_fd, struct ar_hdr header, int index, int argc, char **argv, int verbose)
+{
+    char buffer[BLOCKSIZE];
+    char tmp_buffer[16];
+    int num_read = 0, num_written = 0, copied = 0;
+    int flags = O_WRONLY | O_CREAT | O_TRUNC;
+    struct utimbuf new_times;
+    time_t mtime;
+    mode_t mode;
+    char name[16];
+    /*
+    int i;
+    int valid_name = 0;
+    for (i = index; i < argc; i++) {
+        snprintf(tmp_buffer, 16, "%s", argv[index]);
+        if ((strncmp(tmp_buffer, name, 16)) == 0) {
+            valid_name = 1;
+            break;
+        }
+    }
+    if ((i == argc) && (valid_name != 1)) {
+        return;
+    }
+    */
+    snprintf(name, 16, "%s", header.ar_name);
+    snprintf(tmp_buffer, 8, "%s", header.ar_mode);
+    mode = strtol(tmp_buffer, NULL, 8);
+    int out_fd = open(name, flags, mode);
+    if (out_fd == -1) {
+        perror("Error creating file");
+        exit(-1);
+    }
+    while (copied < atoi(header.ar_size)) {
+        num_read = read(ar_fd, buffer, BLOCKSIZE);
+        num_written = write(out_fd, buffer, BLOCKSIZE);
+        if (num_read != num_written) {
+            perror("Error extracting file");
+            unlink(header.ar_name);
+            exit(-1);
+        }
+        copied += num_written;
+    }
+    // Created the file. Time to adjust some of the values
+    if (fchown(out_fd, atoi(header.ar_uid), atoi(header.ar_gid)) == -1) {
+        perror("Error setting owner/group");
+        exit(-1);
+    }
+    if (close(out_fd) == -1) {
+        perror("Error closing output file");
+        exit(-1);
+    }
+    // Set timestamps on file
+    mtime = atoi(header.ar_date);
+    new_times.actime = mtime;
+    new_times.modtime = time(NULL);
+    if (utime(name, &new_times) == -1) {
+        perror("Error setting time stamps on file");
+        exit(-1);
+    }
+}
+
+void read_archive(int index, int argc, char **argv, char flag)
 {
     if ((argc - index) < 1) {
         printf("Error no archive file specified!\n");
@@ -29,11 +98,10 @@ void read_contents(int index, int argc, char **argv)
     char *archive_name = argv[index];
     int ar_fd;
     int num_read = 0, position = 0, offset = 0;
+    int size;
     struct stat st;
     struct ar_hdr header;
-    int size;
-    char tmp[AR_HDR_SIZE];
-    char buf[17];
+    char buf[SARMAG];
 
     ar_fd = open(archive_name, O_RDONLY);
     if (ar_fd == -1) {
@@ -69,9 +137,18 @@ void read_contents(int index, int argc, char **argv)
         else
             offset = 0;
 
-        snprintf(buf, sizeof(header.ar_name), "%s", header.ar_name);
-        printf("%s\n", buf);
-        position = lseek(ar_fd, size+offset, SEEK_CUR);
+        // hax because i hate callbacks
+        switch(flag) {
+            case 'x':
+                extract(ar_fd, header, index, argc, argv, 0);
+                //position = lseek(ar_fd, size+offset, SEEK_CUR);
+                return;
+            break;
+            case 't':
+                print_table(header, 0);
+                position = lseek(ar_fd, size+offset, SEEK_CUR);
+            break;
+        }
 
     }
 }
@@ -269,7 +346,10 @@ int main(int argc, char **argv)
         append(optind, argc, argv);
     }
     if (t_flag) {
-        read_contents(optind, argc, argv);
+        read_archive(optind, argc, argv, 't');
+    }
+    if (x_flag) {
+        read_archive(optind, argc, argv, 'x');
     }
 
 }
