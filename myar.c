@@ -17,6 +17,12 @@
 
 #include "file_stat.h"
 
+#ifdef DEBUG
+#define debug(M, ...) fprintf(stderr, "DEBUG %s:%d: " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#else
+#define debug(M, ...)
+#endif
+
 #define BLOCKSIZE 1
 
 #define AR_HDR_SIZE sizeof(struct ar_hdr)
@@ -36,16 +42,15 @@ int is_in_args(char *name, int index, int argc, char **argv)
 {
     int found = 0;
     char buffer[16];
-    int same = 0;
     while (index < argc) {
         // compare truncated names
         snprintf(buffer, 16, "%s", argv[index]);
-
-        // haxxxx, I shouldn't need strlen here...
-        // however for some reason `name` has a space and is causing the same
-        // value to return 32 (ASCII for whitespace)
-        same = strncmp(name, buffer, strlen(argv[index]));
-        if (same == 0) {
+        /*
+         * haxxxx, I shouldn't need strlen here...  however for some
+         * reason `name` has a space and is causing the same value to
+         * return 32 (ASCII for whitespace)
+        */
+        if (strncmp(name, buffer, strlen(argv[index])) == 0) {
             found = 1;
             break;
         }
@@ -84,18 +89,21 @@ int extract(int ar_fd, struct ar_hdr header, int verbose)
         perror("Error creating file");
         exit(-1);
     }
-
     size = atoi(header.ar_size);
     while (copied < size) {
         num_read = read(ar_fd, buffer, BLOCKSIZE);
+        if (num_read == 0) // EOF
+            return 0;
         num_written = write(out_fd, buffer, BLOCKSIZE);
         if (num_read != num_written) {
             perror("Error extracting file");
-            unlink(header.ar_name);
+            unlink(name);
             exit(-1);
+
         }
         copied += num_written;
     }
+    debug("copied: %d\n", copied);
     // Created the file. Time to adjust some of the values
     if (fchown(out_fd, atoi(header.ar_uid), atoi(header.ar_gid)) == -1) {
         perror("Error setting owner/group");
@@ -116,8 +124,6 @@ int extract(int ar_fd, struct ar_hdr header, int verbose)
     }
     */
 
-    if (copied % 2)
-        copied += 1;
     return copied;
 }
 
@@ -156,30 +162,54 @@ void read_archive(int index, int argc, char **argv, char flag)
         perror("Error trying to stat file");
     }
 
+    debug("archive size: %lu\n", st.st_size);
     while (position <= st.st_size-1) {
         offset = 0;
         // Read the header into our struct
         num_read = read(ar_fd, &header, AR_HDR_SIZE);
+        debug("header num_read %d\n", num_read);
+        position = lseek(ar_fd, 0, SEEK_CUR);
+        debug("position: %d\n", position);
         if (num_read == -1) {
             perror("Error reading file");
             exit(-1);
         }
 
         size = atoi(header.ar_size);
-        // Even byte alignment check
+
         if (size % 2)
             offset = 1;
-
         // hax because i hate callbacks
         switch(flag) {
         case 'x':
             // Check the header to see if this is one of the files we are
             snprintf(name, 16, "%s", header.ar_name);
-            if (is_in_args(name, index, argc, argv)) {
-                position += extract(ar_fd, header, 0);
+            debug("name: %s\nsize: %d\n", name, size);
+            /*
+             * if no args besides the options and archive are passed,
+             * extract all files
+             *
+             * otherwise check if the file we're at in the archive is one of
+             * the specified files to extract
+             */
+            if ((index == argc) || (is_in_args(name, index, argc, argv))) {
+                debug("extracting\n");
+                offset = extract(ar_fd, header, 0);
+                if (offset == 0) // EOF
+                    return;
+                else
+                    position += offset;
+                // Check if we are on even byte boundry
+                // move forward 1 if we are
+                if (position % 2) {
+                    position = lseek(ar_fd, 1, SEEK_CUR);
+                }
             } else {
+                debug("skipping\n");
+                // Even byte alignment check
                 position = lseek(ar_fd, size+offset, SEEK_CUR);
             }
+            debug("position: %d\n", position);
         break;
 
         case 't':
