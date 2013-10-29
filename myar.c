@@ -21,46 +21,72 @@
 
 #define AR_HDR_SIZE sizeof(struct ar_hdr)
 
-void print_table(struct ar_hdr header, int verbose)
+void trim(char *str) {
+    int i = strlen(str) - 1;
+    while (i > 0) {
+        if isspace(str[i])
+            str[i] = '\0';
+        else
+            break;
+        i--;
+    }
+}
+
+int is_in_args(char *name, int index, int argc, char **argv)
+{
+    int found = 0;
+    char buffer[16];
+    int same = 0;
+    while (index < argc) {
+        // compare truncated names
+        snprintf(buffer, 16, "%s", argv[index]);
+
+        // haxxxx, I shouldn't need strlen here...
+        // however for some reason `name` has a space and is causing the same
+        // value to return 32 (ASCII for whitespace)
+        same = strncmp(name, buffer, strlen(argv[index]));
+        if (same == 0) {
+            found = 1;
+            break;
+        }
+        index++;
+    }
+    return found;
+}
+
+void print_table(struct ar_hdr header, int index, int argc, char **argv, int verbose)
 {
     char buf[17];
     snprintf(buf, sizeof(header.ar_name), "%s", header.ar_name);
     printf("%s\n", buf);
 }
 
-void extract(int ar_fd, struct ar_hdr header, int index, int argc, char **argv, int verbose)
+int extract(int ar_fd, struct ar_hdr header, int verbose)
 {
-    char buffer[BLOCKSIZE];
     char tmp_buffer[16];
+    char name_buffer[16];
+    char *name = name_buffer;
+    char buffer[BLOCKSIZE];
     int num_read = 0, num_written = 0, copied = 0;
+    int size = 0;
     int flags = O_WRONLY | O_CREAT | O_TRUNC;
     struct utimbuf new_times;
     time_t mtime;
     mode_t mode;
-    char name[16];
-    /*
-    int i;
-    int valid_name = 0;
-    for (i = index; i < argc; i++) {
-        snprintf(tmp_buffer, 16, "%s", argv[index]);
-        if ((strncmp(tmp_buffer, name, 16)) == 0) {
-            valid_name = 1;
-            break;
-        }
-    }
-    if ((i == argc) && (valid_name != 1)) {
-        return;
-    }
-    */
+
     snprintf(name, 16, "%s", header.ar_name);
+    trim(name);
     snprintf(tmp_buffer, 8, "%s", header.ar_mode);
     mode = strtol(tmp_buffer, NULL, 8);
+
     int out_fd = open(name, flags, mode);
     if (out_fd == -1) {
         perror("Error creating file");
         exit(-1);
     }
-    while (copied < atoi(header.ar_size)) {
+
+    size = atoi(header.ar_size);
+    while (copied < size) {
         num_read = read(ar_fd, buffer, BLOCKSIZE);
         num_written = write(out_fd, buffer, BLOCKSIZE);
         if (num_read != num_written) {
@@ -80,6 +106,7 @@ void extract(int ar_fd, struct ar_hdr header, int index, int argc, char **argv, 
         exit(-1);
     }
     // Set timestamps on file
+    /*
     mtime = atoi(header.ar_date);
     new_times.actime = mtime;
     new_times.modtime = time(NULL);
@@ -87,6 +114,11 @@ void extract(int ar_fd, struct ar_hdr header, int index, int argc, char **argv, 
         perror("Error setting time stamps on file");
         exit(-1);
     }
+    */
+
+    if (copied % 2)
+        copied += 1;
+    return copied;
 }
 
 void read_archive(int index, int argc, char **argv, char flag)
@@ -95,13 +127,14 @@ void read_archive(int index, int argc, char **argv, char flag)
         printf("Error no archive file specified!\n");
         exit(-1);
     }
-    char *archive_name = argv[index];
+    char *archive_name = argv[index]; index++;
     int ar_fd;
     int num_read = 0, position = 0, offset = 0;
     int size;
     struct stat st;
     struct ar_hdr header;
     char buf[SARMAG];
+    char name[16];
 
     ar_fd = open(archive_name, O_RDONLY);
     if (ar_fd == -1) {
@@ -124,32 +157,39 @@ void read_archive(int index, int argc, char **argv, char flag)
     }
 
     while (position <= st.st_size-1) {
+        offset = 0;
         // Read the header into our struct
         num_read = read(ar_fd, &header, AR_HDR_SIZE);
         if (num_read == -1) {
             perror("Error reading file");
             exit(-1);
         }
+
         size = atoi(header.ar_size);
         // Even byte alignment check
         if (size % 2)
             offset = 1;
-        else
-            offset = 0;
 
         // hax because i hate callbacks
         switch(flag) {
-            case 'x':
-                extract(ar_fd, header, index, argc, argv, 0);
-                //position = lseek(ar_fd, size+offset, SEEK_CUR);
-                return;
-            break;
-            case 't':
-                print_table(header, 0);
+        case 'x':
+            // Check the header to see if this is one of the files we are
+            snprintf(name, 16, "%s", header.ar_name);
+            if (is_in_args(name, index, argc, argv)) {
+                position += extract(ar_fd, header, 0);
+            } else {
                 position = lseek(ar_fd, size+offset, SEEK_CUR);
-            break;
-        }
+            }
+        break;
 
+        case 't':
+            print_table(header, index, argc, argv, 0);
+            position = lseek(ar_fd, size+offset, SEEK_CUR);
+        break;
+
+        default:
+        break;
+        }
     }
 }
 
@@ -260,9 +300,8 @@ int append(int index, int argc, char **argv)
         exit(-1);
     }
 
-    char *archive_name = argv[index];
     // Increment our index because we will be working on the non archive files next.
-    index++;
+    char *archive_name = argv[index]; index++;
 
     // Open the ar file and put the ARMAG string in if its a new file.
     ar_fd = open_archive(archive_name);
