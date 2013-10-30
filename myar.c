@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -97,6 +98,7 @@ int append(int index, int argc, char **argv)
 {
     int in_fd, ar_fd;
     struct stat st;
+    char *file_name;
 
     if ((argc - index) < 2) {
         printf("Error, must provide at least 2 args\n");
@@ -113,14 +115,18 @@ int append(int index, int argc, char **argv)
     }
     // Now we are going to iterate through each file after the archive file
     while (index < argc) {
-        in_fd = open(argv[index], O_RDONLY);
+        file_name = argv[index];
+        in_fd = open(file_name, O_RDONLY);
         if (fstat(in_fd, &st) == -1) {
             perror("Unable to stat file");
             exit(-1);
         }
+        if (!S_ISREG(st.st_mode))
+            printf("%s: file format not recognized\n", file_name);
+
         // We've got the stat struct, lets write the ar_hdr
-        write_header(ar_fd, st, argv[index]);
-        write_contents(ar_fd, in_fd, st, argv[index]);
+        write_header(ar_fd, st, basename(file_name));
+        write_contents(ar_fd, in_fd, st, archive_name);
         index++;
         if (close(in_fd) == -1) {
             perror("Unable to close input file");
