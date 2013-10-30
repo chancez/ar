@@ -80,6 +80,12 @@ int main(int argc, char **argv)
         }
     }
 
+    if (((q_flag || t_flag || x_flag || d_flag) == 0) && v_flag) {
+        printf("-v flag requires another command!\n");
+        usage();
+        return -1;
+    }
+
     if (q_flag) {
         append(optind, argc, argv, v_flag);
     }
@@ -100,14 +106,10 @@ int main(int argc, char **argv)
 
 int append(int index, int argc, char **argv, int verbose)
 {
-    int ar_fd;
-    struct stat st;
-    char *file_name;
+    check_args(index, argc);
 
-    if ((argc - index) == 0) {
-        printf("Error\n");
-        exit(-1);
-    }
+    int ar_fd;
+    char *file_name;
 
     // Increment our index because we will be working on the non archive files next.
     char *archive_name = argv[index]; index++;
@@ -324,10 +326,8 @@ int extract_file(int ar_fd, struct ar_hdr header, int verbose)
 
 void read_archive(int index, int argc, char **argv, char flag, int verbose)
 {
-    if ((argc - index) < 1) {
-        printf("Error no archive file specified!\n");
-        exit(-1);
-    }
+    check_args(index, argc);
+
     char *archive_name = argv[index]; index++;
     int ar_fd, new_ar_fd;
     int num_read = 0, position = 0, offset = 0;
@@ -585,5 +585,26 @@ int is_in_args(char *name, int index, int argc, char **argv)
         index++;
     }
     return found;
+}
+
+void check_args(int index, int argc)
+{
+    if ((argc - index) == 0) {
+        printf("Error no archive file specified!\n");
+        exit(-1);
+    }
+}
+
+void usage()
+{
+printf(
+"Usage: ar [commands] archive-file file...\n"
+"commands:\n"
+"  -d            - delete file(s) from the archive\n"
+"  -q            - quick append file(s) to the archive\n"
+"  -t            - display contents of archive\n"
+"  -x            - extract file(s) from the archive\n"
+"Generic Modifiers:\n"
+"  -v          - be verbose\n");
 }
 

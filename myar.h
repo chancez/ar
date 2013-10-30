@@ -29,6 +29,7 @@ int write_file(int in_fd, int out_fd, struct ar_hdr header, char* file_name);
 /* Helpers */
 int is_in_args(char *name, int index, int argc, char **argv);
 void trim(char *str);
+void check_args(int index, int argc);
 void usage();
 
 #endif
