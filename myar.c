@@ -223,24 +223,24 @@ int extract_file(int ar_fd, struct ar_hdr header, int verbose)
 {
     char tmp_buffer[16];
     char name_buffer[16];
-    char *name = name_buffer;
+    char *file_name = name_buffer;
     int copied = 0;
     int flags = O_WRONLY | O_CREAT | O_TRUNC;
     struct utimbuf new_times;
     time_t mtime;
     mode_t mode;
 
-    snprintf(name, 16, "%s", header.ar_name);
-    trim(name);
+    snprintf(file_name, 16, "%s", header.ar_name);
+    trim(file_name);
     snprintf(tmp_buffer, 8, "%s", header.ar_mode);
     mode = strtol(tmp_buffer, NULL, 8);
 
-    int out_fd = open(name, flags, mode);
+    int out_fd = open(file_name, flags, mode);
     if (out_fd == -1) {
         perror("Error creating file");
         exit(-1);
     }
-    copied = write_file(ar_fd, out_fd, header, name);
+    copied = write_file(ar_fd, out_fd, header, file_name);
     debug("copied: %d", copied);
     // Created the file. Time to adjust some of the values
     if (fchown(out_fd, atoi(header.ar_uid), atoi(header.ar_gid)) == -1) {
@@ -255,10 +255,13 @@ int extract_file(int ar_fd, struct ar_hdr header, int verbose)
     mtime = atoi(header.ar_date);
     new_times.actime = mtime;
     new_times.modtime = time(NULL);
-    if (utime(name, &new_times) == -1) {
+    if (utime(file_name, &new_times) == -1) {
         perror("Error setting time stamps on file");
         exit(-1);
     }
+
+    if (verbose)
+        printf("x - %s\n", file_name);
 
     return copied;
 }
@@ -335,7 +338,7 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
              */
             if ((index == argc) || (is_in_args(name, index, argc, argv))) {
                 debug("extracting file %s", name);
-                offset = extract_file(ar_fd, header, 0);
+                offset = extract_file(ar_fd, header, verbose);
                 if (offset == 0) // EOF
                     return;
                 else
