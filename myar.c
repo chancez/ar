@@ -121,8 +121,11 @@ int append(int index, int argc, char **argv)
             perror("Unable to stat file");
             exit(-1);
         }
-        if (!S_ISREG(st.st_mode))
-            printf("%s: file format not recognized\n", file_name);
+        if (!S_ISREG(st.st_mode)) {
+            printf("%s: File format not recognized\n", file_name);
+            unlink(archive_name);
+            exit(-1);
+        }
 
         // We've got the stat struct, lets write the ar_hdr
         write_header(ar_fd, st, basename(file_name));
