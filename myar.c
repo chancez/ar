@@ -3,6 +3,7 @@
 
 #include <ar.h>
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -82,6 +83,9 @@ int main(int argc, char **argv)
     if (q_flag) {
         append(optind, argc, argv, v_flag);
     }
+    if (A_flag) {
+        append_all(optind, argc, argv, v_flag);
+    }
     if (t_flag) {
         table_of_contents(optind, argc, argv, v_flag);
     }
@@ -96,7 +100,7 @@ int main(int argc, char **argv)
 
 int append(int index, int argc, char **argv, int verbose)
 {
-    int in_fd, ar_fd;
+    int ar_fd;
     struct stat st;
     char *file_name;
 
@@ -116,27 +120,8 @@ int append(int index, int argc, char **argv, int verbose)
     // Now we are going to iterate through each file after the archive file
     while (index < argc) {
         file_name = argv[index];
-        in_fd = open(file_name, O_RDONLY);
-        if (fstat(in_fd, &st) == -1) {
-            perror("Unable to stat file");
-            exit(-1);
-        }
-        if (!S_ISREG(st.st_mode)) {
-            printf("%s: File format not recognized\n", file_name);
-            unlink(archive_name);
-            exit(-1);
-        }
-
-        // We've got the stat struct, lets write the ar_hdr
-        write_header(ar_fd, st, basename(file_name));
-        write_contents(ar_fd, in_fd, st, archive_name);
+        append_file(file_name, ar_fd, archive_name, verbose);
         index++;
-        if (close(in_fd) == -1) {
-            perror("Unable to close input file");
-            exit(-1);
-        }
-        if (verbose)
-            printf("a - %s\n", file_name);
     }
     if (close(ar_fd) == -1) {
         perror("Unable to close archive file");
@@ -144,6 +129,77 @@ int append(int index, int argc, char **argv, int verbose)
     }
 
     return 0;
+}
+
+int append_file(char *file_name, int ar_fd, char *archive_name, int verbose)
+{
+    int in_fd = open(file_name, O_RDONLY);
+    if (in_fd == -1) {
+        perror("Error opening file");
+        unlink(archive_name);
+        exit(-1);
+    }
+    struct stat st;
+    int num_written = 0;
+    if (fstat(in_fd, &st) == -1) {
+        perror("Unable to stat file");
+        exit(-1);
+    }
+    if (!S_ISREG(st.st_mode)) {
+        printf("%s: File format not recognized\n", file_name);
+        unlink(archive_name);
+        exit(-1);
+    }
+
+    // We've got the stat struct, lets write the ar_hdr
+    num_written += write_header(ar_fd, st, basename(file_name));
+    num_written += write_contents(ar_fd, in_fd, st, archive_name);
+
+    if (close(in_fd) == -1) {
+        perror("Unable to close input file");
+        exit(-1);
+    }
+    if (verbose)
+        printf("a - %s\n", file_name);
+
+    return num_written;
+}
+
+
+void append_all(int index, int argc, char **argv, int verbose)
+{
+    DIR *dir;
+    struct dirent *ent;
+    struct stat st;
+    dir = opendir(".");
+    if (dir == NULL) {
+        perror("Error opening current directory");
+        exit(-1);
+    }
+
+    char *archive_name = argv[index];
+    int ar_fd = open_archive(archive_name);
+
+    if (ar_fd == -1) {
+        perror("Error opening file");
+    }
+
+    while ((ent = readdir(dir)) != NULL) {
+        // Skip the archive file and skip the archive program
+        if (!strcmp(ent->d_name, archive_name) || !strcmp(ent->d_name, basename(argv[0]))) {
+            debug("Skipping file %s", ent->d_name);
+            continue;
+        }
+
+        if (stat(ent->d_name, &st) == -1){
+            perror("Error stating file");
+            unlink(archive_name);
+            exit(-1);
+        }
+        if (S_ISREG(st.st_mode)) {
+            append_file(ent->d_name, ar_fd, archive_name, verbose);
+        }
+    }
 }
 
 void delete(int index, int argc, char **argv, int verbose)
@@ -414,11 +470,11 @@ struct ar_hdr ar_header(struct stat st, char *file_name)
     return header;
 }
 
-void write_header(int ar_fd, struct stat st, char* file_name)
+int write_header(int ar_fd, struct stat st, char* file_name)
 {
     struct ar_hdr header;
     char buffer[AR_HDR_SIZE];
-    int num_written;
+    int num_written = 0;
     // Create the ar_header given the stat struct and file name.
     header = ar_header(st, file_name);
 
@@ -434,6 +490,7 @@ void write_header(int ar_fd, struct stat st, char* file_name)
         unlink(file_name);
         exit(-1);
     }
+    return num_written;
 }
 
 int write_contents(int ar_fd, int in_fd, struct stat st, char *file_name)
@@ -454,18 +511,20 @@ int write_contents(int ar_fd, int in_fd, struct stat st, char *file_name)
     }
     if (total_written % 2) // Even byte alignment
         write(ar_fd, "\n", 1);
-    return 0;
+    return total_written;
 }
 
-void write_armag(int fd, char* filename) {
+int write_armag(int fd, char* filename) {
     char buf[] = ARMAG;
-    int written;
+    int written = 0;
     written = write(fd, buf, SARMAG);
     if (written != SARMAG) {
         printf("Error while writing ARMAG header");
         unlink(filename);
         exit(-1);
     }
+
+    return written;
 }
 
 int open_archive(char *archive_name)
