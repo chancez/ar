@@ -78,6 +78,65 @@ reading the file until the ARMAG constants and parsing the ar header data.
 % To be filled in when finished
 
 \section{Challenges}
+The assignment itself was fairly straight forward, and implementation itself
+wasn't too difficult either. My biggest challenge was getting stuck on the
+small off by one errors. In particular when trying to get extraction working, I
+wasn't checking for if read() returned 0 for end of file. Along with that, I
+was accounting for even byte boundaries in most places, but when working on the
+extraction piece I forgot about that as well, and things were not working due
+to that.
 
+So overall the biggest challenge was debugging. Tools like GDB helped a little,
+but most of my problems were due to lack a lack of familiarity with particular
+functions and system calls.
+
+\section{Questions}
+\begin{description}
+\item[Q1:] What do you think the main point of this assignment is?
+\item[A1:] I think the point of this assignment is to introduce the class to a
+slightly complex C application with a couple of different components to worry
+about. Since we will likely be using command line args for most of our
+programs, learning to use getopt in C one of the points. I think its main
+purpose was to become familiar with the system call API.
+
+\item[Q2:] How did you ensure your solution was correct? Testing details, for instance.
+\item[A2:] When testing I built archives using the built in unix ar program,
+with various sizes (even and odd), different owners, groups, ect. I then tested
+replicating these archive files with my archiver and compared them using diff
+to ensure consistency.
+
+Next I would use my archiver to extract, delete, and print items from the real
+archive file created with the built in ar, and I would use the built in ar to
+do the same on the archive file created with my archiver. I would then use diff
+to compare all results with the original files, as well as the ones extracted
+from the various archiver programs.
+
+To test the -A option, I created test directories with various file types
+inside of them, and tested that it didn't archive itself or the executable.
+When testing verbose output, I would redirect the output from the real ar into
+a file, and then do the same with mine, and compare the files using diff again.
+
+\item[Q3:] What did you learn?
+\item[A3:] I learned that in order to do well on these assignments you need to
+work very iteratively and make sure you understand the underlying problem. You
+also need to become very familiar with the tools your using for the given task.
+As I mentioned in my challenges, reading the man pages a little more carefully
+would have saved me a lot of time running into issues.
+
+I also found that you can't sit too long staring at a single problem, and that
+if your stuck, to try finding something else you can work on until you've got a
+fresh mind to take a look at the old problem you were having. In on case, I
+could not get utime to work for some reason and stopped on it for a while.
+After finishing the rest of another command, I went back to fix utime and it
+was working because of another bug I fixed along the way.
+
+Finally I learned that asking for help isn't a terrible thing. Sometimes it's
+easy to forget small things that you understand, but aren't perceiving
+correctly, and someone from the outside might be able to immediately pick up on
+what your doing wrong. For example when trying to set file permissions back
+onto the file, I was getting the wrong permissions set. With help from a friend
+realized my issue was that I wasn't setting the mode back to octal, and that
+was my issue.
+\end{description}
 
 \end{document}
