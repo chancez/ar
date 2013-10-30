@@ -100,8 +100,8 @@ int append(int index, int argc, char **argv, int verbose)
     struct stat st;
     char *file_name;
 
-    if ((argc - index) < 2) {
-        printf("Error, must provide at least 2 args\n");
+    if ((argc - index) == 0) {
+        printf("Error\n");
         exit(-1);
     }
 
@@ -135,6 +135,8 @@ int append(int index, int argc, char **argv, int verbose)
             perror("Unable to close input file");
             exit(-1);
         }
+        if (verbose)
+            printf("a - %s\n", file_name);
     }
     if (close(ar_fd) == -1) {
         perror("Unable to close archive file");
