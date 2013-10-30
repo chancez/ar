@@ -19,7 +19,7 @@ int copy_file(int new_fd, int old_fd, struct ar_hdr, char *file_name, int verbos
 void print_table(struct ar_hdr header, int verbose);
 
 /* Utils */
-int open_archive(char *archive_name);
+int open_archive(char *archive_name, int verbose);
 struct ar_hdr ar_header(struct stat st, char *file_name);
 int write_armag(int fd, char* filename);
 int write_header(int ar_fd, struct stat st, char* file_name);

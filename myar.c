@@ -115,7 +115,7 @@ int append(int index, int argc, char **argv, int verbose)
     char *archive_name = argv[index]; index++;
 
     // Open the ar file and put the ARMAG string in if its a new file.
-    ar_fd = open_archive(archive_name);
+    ar_fd = open_archive(archive_name, 1);
     if (ar_fd == -1) {
         perror("Error opening file");
     }
@@ -180,7 +180,7 @@ void append_all(int index, int argc, char **argv, int verbose)
     }
 
     char *archive_name = argv[index];
-    int ar_fd = open_archive(archive_name);
+    int ar_fd = open_archive(archive_name, 1);
 
     if (ar_fd == -1) {
         perror("Error opening file");
@@ -425,7 +425,7 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
                     exit(-1);
                 }
                 deleted = 1;
-                new_ar_fd = open_archive(archive_name);
+                new_ar_fd = open_archive(archive_name, 0);
             }
             // If there were no args, so copy nothing
             if (index == argc) {
@@ -527,7 +527,7 @@ int write_armag(int fd, char* filename) {
     return written;
 }
 
-int open_archive(char *archive_name)
+int open_archive(char *archive_name, int verbose)
 {
     int ar_fd;
     int flags = O_RDWR | O_APPEND;
@@ -538,7 +538,8 @@ int open_archive(char *archive_name)
         // Doesn't exist, lets re-open it with the create flag
         if (errno == ENOENT) {
             flags |= O_CREAT;
-            printf("creating %s\n", archive_name);
+            if (verbose)
+                printf("creating %s\n", archive_name);
             ar_fd = open(archive_name, flags, mode);
         }
         if (ar_fd == -1) {
