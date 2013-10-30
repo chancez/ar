@@ -42,7 +42,7 @@
 \parindent = 0.0 in
 \parskip = 0.2 in
 
-\title{CS311 Assignment 1}
+\title{CS311 Assignment 2}
 \author{\name}
 \date{October 2013}
 
@@ -73,6 +73,19 @@ the ARMAG constants, which will let me iteratively go through the file and
 either print the -t contents, delete files using -d or extract files using -x.
 All of those will be very similar, so I will likely have utility functions for
 reading the file until the ARMAG constants and parsing the ar header data.
+
+\subsection{Deviations from Original Design}
+I pretty much followed my plan from beginning to end. The only part that I
+really deviated with was where I found I could not extract the looping through
+the archive file logic. It was mostly because I wouldn't be able to simply
+store all of that data into memory and had to deal with things as I iterated
+through the archive file, and this was simply a limitation of the design.
+
+Since extraction, deletion, printing the table of contents, all required
+iterating through the archive file, and we could only pass through it at most
+one time, I ended up having to use a case statement inside the loop. I could
+have used call backs which all returned how far they iterated through the file,
+however I disliked the idea of that and went with the case statement instead.
 
 \section{Work Log}
 % To be filled in when finished
