@@ -381,11 +381,6 @@ struct ar_hdr ar_header(struct stat st, char *file_name)
     snprintf(header.ar_mode, sizeof(header.ar_mode), "%o", st.st_mode);
     snprintf(header.ar_size, sizeof(header.ar_size), "%lu", st.st_size);
     snprintf(header.ar_fmag, sizeof(ARFMAG), "%s", ARFMAG);
-    /*
-    snprintf(header, sizeof(AR_HDR_SIZE), "%s%lu%u%u%o%lu%s",
-        st.st_mtime, st.st_mtime, st.st_uid, st.st_gid,
-        st.st_mode, st.st_size, ARFMAG);
-    */
     return header;
 }
 
