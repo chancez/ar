@@ -16,3 +16,9 @@
 *.exe
 *.out
 *.app
+
+*.aux
+*.pdf
+*.aux
+*.ps
+*.dvi
