@@ -92,9 +92,7 @@ say '\begin{tabular}{lp{12cm}}
   ' . loc('DL') . ' & ' . loc('Number of \texttt{deleted lines}.') . ' \\\\
 \end{tabular}
 
-\bigskip
-
-\iflanguage{ngerman}{\shorthandoff{"}}{}';
+\bigskip';
 
 if ($print_author) {
     say "\\begin{longtable}{|rllllrrr|}";
