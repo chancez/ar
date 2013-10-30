@@ -233,7 +233,6 @@ int extract_file(int ar_fd, struct ar_hdr header, int verbose)
         exit(-1);
     }
     // Set timestamps on file
-    /*
     mtime = atoi(header.ar_date);
     new_times.actime = mtime;
     new_times.modtime = time(NULL);
@@ -241,7 +240,6 @@ int extract_file(int ar_fd, struct ar_hdr header, int verbose)
         perror("Error setting time stamps on file");
         exit(-1);
     }
-    */
 
     return copied;
 }
