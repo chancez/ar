@@ -456,6 +456,7 @@ int open_archive(char *archive_name)
         // Doesn't exist, lets re-open it with the create flag
         if (errno == ENOENT) {
             flags |= O_CREAT;
+            printf("creating %s\n", archive_name);
             ar_fd = open(archive_name, flags, mode);
         }
         if (ar_fd == -1) {
