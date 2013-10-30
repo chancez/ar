@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE
 
 #include <ar.h>
 #include <ctype.h>
@@ -79,22 +80,21 @@ int main(int argc, char **argv)
     }
 
     if (q_flag) {
-        append(optind, argc, argv);
+        append(optind, argc, argv, v_flag);
     }
     if (t_flag) {
-        table_of_contents(optind, argc, argv);
+        table_of_contents(optind, argc, argv, v_flag);
     }
     if (x_flag) {
-        extract(optind, argc, argv);
+        extract(optind, argc, argv, v_flag);
     }
-
     if (d_flag) {
-        delete(optind, argc, argv);
+        delete(optind, argc, argv, v_flag);
     }
 
 }
 
-int append(int index, int argc, char **argv)
+int append(int index, int argc, char **argv, int verbose)
 {
     int in_fd, ar_fd;
     struct stat st;
@@ -144,25 +144,42 @@ int append(int index, int argc, char **argv)
     return 0;
 }
 
-void delete(int index, int argc, char **argv)
+void delete(int index, int argc, char **argv, int verbose)
 {
-    read_archive(optind, argc, argv, 'd');
+    read_archive(optind, argc, argv, 'd', verbose);
 }
 
-void table_of_contents(int index, int argc, char **argv)
+void table_of_contents(int index, int argc, char **argv, int verbose)
 {
-    read_archive(optind, argc, argv, 't');
+    read_archive(optind, argc, argv, 't', verbose);
 }
 
-void extract(int index, int argc, char **argv)
+void extract(int index, int argc, char **argv, int verbose)
 {
-    read_archive(index, argc, argv, 'x');
+    read_archive(index, argc, argv, 'x', verbose);
 }
 
-void print_table(struct ar_hdr header, int index, int argc, char **argv, int verbose)
+void print_table(struct ar_hdr header, int verbose)
 {
-    char buf[17];
-    snprintf(buf, sizeof(header.ar_name), "%s", header.ar_name);
+    char buf[200];
+    char tmp[20];
+    char time_str[20];
+    int mode;
+    struct tm time;
+    /* rw-rw-r-- 1000/1000    430 Oct 29 19:00 2013 bio.mkd */
+    if (verbose) {
+        snprintf(tmp, 8, "%s", header.ar_mode);
+        mode = strtol(tmp, NULL, 8);
+        snprintf(tmp, 16, "%s", header.ar_date);
+        strptime(tmp, "%s", &time);
+        strftime(time_str, sizeof(tmp),"%b %d %H:%M %Y", &time);
+        snprintf(tmp, 16, "%s", header.ar_name);
+        snprintf(buf, 200, "%s %d/%d %6d %s %s",
+            file_perm_string(mode, 0), atoi(header.ar_uid), atoi(header.ar_gid),
+            atoi(header.ar_size), time_str, tmp);
+    } else {
+        snprintf(buf, sizeof(header.ar_name), "%s", header.ar_name);
+    }
     printf("%s\n", buf);
 }
 
@@ -244,7 +261,7 @@ int extract_file(int ar_fd, struct ar_hdr header, int verbose)
     return copied;
 }
 
-void read_archive(int index, int argc, char **argv, char flag)
+void read_archive(int index, int argc, char **argv, char flag, int verbose)
 {
     if ((argc - index) < 1) {
         printf("Error no archive file specified!\n");
@@ -334,7 +351,8 @@ void read_archive(int index, int argc, char **argv, char flag)
         break;
 
         case 't':
-            print_table(header, index, argc, argv, 0);
+            if ((index == argc) || (is_in_args(name, index, argc, argv)))
+                print_table(header, verbose);
             position = lseek(ar_fd, size+offset, SEEK_CUR);
         break;
 
