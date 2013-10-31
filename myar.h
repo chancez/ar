@@ -15,7 +15,7 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose);
 /* read_archive calls these */
 int append_file(char *file_name, int ar_fd, char *archive_name, int verbose);
 int extract_file(int ar_fd, struct ar_hdr header, int verbose);
-int copy_file(int new_fd, int old_fd, struct ar_hdr, char *file_name, int verbose);
+int copy_file(int new_fd, int old_fd, struct ar_hdr, char *file_name);
 void print_table(struct ar_hdr header, int verbose);
 
 /* Utils */

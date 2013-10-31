@@ -244,7 +244,7 @@ void print_table(struct ar_hdr header, int verbose)
     printf("%s\n", buf);
 }
 
-int copy_file(int new_fd, int old_fd, struct ar_hdr header, char *file_name, int verbose)
+int copy_file(int new_fd, int old_fd, struct ar_hdr header, char *file_name)
 {
     int total_written = 0, num_written = 0;
 
@@ -453,11 +453,13 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
             // If its in args, then we *dont* want to keep it.
             if (is_in_args(name, index, argc, argv)) {
                 debug("Deleting file");
+                if (verbose)
+                    printf("d - %s\n", name);
                 position = lseek(ar_fd, size+offset, SEEK_CUR);
             } else {
                 // Copy files not in args so we keep them
                 debug("Copying file");
-                offset = copy_file(new_ar_fd, ar_fd, header, archive_name, verbose);
+                offset = copy_file(new_ar_fd, ar_fd, header, archive_name);
                 if (offset == 0) { // EOF
                     return;
                 } else {
