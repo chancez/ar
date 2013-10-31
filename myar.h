@@ -29,6 +29,7 @@ int write_file(int in_fd, int out_fd, struct ar_hdr header, char* file_name);
 /* Helpers */
 int is_in_args(char *name, int index, int argc, char **argv);
 void trim(char *str);
+int check_byte_alignment(int in_fd, int total_written, char *file_name);
 void check_args(int index, int argc);
 void usage();
 

@@ -152,7 +152,8 @@ int append_file(char *file_name, int ar_fd, char *archive_name, int verbose)
         unlink(archive_name);
         exit(-1);
     }
-
+    debug("File: %s", file_name);
+    debug("Size: %lu", st.st_size);
     // We've got the stat struct, lets write the ar_hdr
     num_written += write_header(ar_fd, st, basename(file_name));
     num_written += write_contents(ar_fd, in_fd, st, archive_name);
@@ -245,13 +246,22 @@ void print_table(struct ar_hdr header, int verbose)
 
 int copy_file(int new_fd, int old_fd, struct ar_hdr header, char *file_name, int verbose)
 {
+    int total_written = 0, num_written = 0;
+
     // write the header to the new archive
-    int num_written = write(new_fd, &header, AR_HDR_SIZE);
-    if (num_written == -1) {
+    total_written = write(new_fd, &header, AR_HDR_SIZE);
+    if (total_written == -1) {
         perror("Error write header when making new file");
         exit(-1);
     }
-    return write_file(old_fd, new_fd, header, file_name);
+    // write its contents
+    num_written = write_file(old_fd, new_fd, header, file_name);
+    // return if its EOF
+    if (num_written == 0)
+        return 0;
+    else
+        total_written += num_written;
+    return total_written;
 }
 
 int write_file(int in_fd, int out_fd, struct ar_hdr header, char* file_name)
@@ -259,15 +269,23 @@ int write_file(int in_fd, int out_fd, struct ar_hdr header, char* file_name)
     int num_read = 0, num_written = 0, copied = 0;
     int size;
     char buffer[BLOCKSIZE];
+
+    #ifdef DEBUG
+    char name[17];
+    snprintf(name, 16, "%s", header.ar_name);
+    debug("write_file: ar_name: %s", name);
+    #endif
+
     size = atoi(header.ar_size);
     debug("Size: %d", size);
+
     while (copied < size) {
         num_read = read(in_fd, buffer, BLOCKSIZE);
         if (num_read == 0) // EOF
             return 0;
         num_written = write(out_fd, buffer, BLOCKSIZE);
         if (num_read != num_written) {
-            perror("Error extracting file");
+            perror("Error writing file");
             unlink(file_name);
             exit(-1);
 
@@ -435,17 +453,19 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
             // If its in args, then we *dont* want to keep it.
             if (is_in_args(name, index, argc, argv)) {
                 debug("Deleting file");
-                // Even byte alignment check
                 position = lseek(ar_fd, size+offset, SEEK_CUR);
             } else {
                 // Copy files not in args so we keep them
                 debug("Copying file");
-                offset = copy_file(new_ar_fd, ar_fd, header, archive_name, 0);
-                if (offset == 0) // EOF
+                offset = copy_file(new_ar_fd, ar_fd, header, archive_name, verbose);
+                if (offset == 0) { // EOF
                     return;
-                else
+                } else {
+                    check_byte_alignment(new_ar_fd, offset, archive_name);
                     position += offset;
-                if (position % 2 ) {
+                }
+                // even byte alignment check
+                if (position % 2) {
                     position = lseek(ar_fd, 1, SEEK_CUR);
                 }
             }
@@ -509,8 +529,7 @@ int write_contents(int ar_fd, int in_fd, struct stat st, char *file_name)
         total_read += num_read;
         total_written += num_written;
     }
-    if (total_written % 2) // Even byte alignment
-        write(ar_fd, "\n", 1);
+    total_written += check_byte_alignment(ar_fd, total_written, file_name);
     return total_written;
 }
 
@@ -586,6 +605,20 @@ int is_in_args(char *name, int index, int argc, char **argv)
         index++;
     }
     return found;
+}
+
+int check_byte_alignment(int in_fd, int total_written, char *file_name)
+{
+    if (total_written % 2) { // Even byte alignment
+        debug("Not even, adding newline \\n");
+        if (write(in_fd, "\n", 1) == -1) {
+            perror("Error writing to file");
+            unlink(file_name);
+            exit(-1);
+        }
+        return 1;
+    }
+    return 0;
 }
 
 void check_args(int index, int argc)
