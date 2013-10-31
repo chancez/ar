@@ -80,6 +80,11 @@ int main(int argc, char **argv)
         }
     }
 
+    if (argc == 1) {
+        usage();
+        return -1;
+    }
+
     if (((q_flag || t_flag || x_flag || d_flag) == 0) && v_flag) {
         printf("-v flag requires another command!\n");
         usage();
@@ -88,17 +93,13 @@ int main(int argc, char **argv)
 
     if (q_flag) {
         append(optind, argc, argv, v_flag);
-    }
-    if (A_flag) {
+    } else if (A_flag) {
         append_all(optind, argc, argv, v_flag);
-    }
-    if (t_flag) {
+    } else if (t_flag) {
         table_of_contents(optind, argc, argv, v_flag);
-    }
-    if (x_flag) {
+    } else if (x_flag) {
         extract(optind, argc, argv, v_flag);
-    }
-    if (d_flag) {
+    } else if (d_flag) {
         delete(optind, argc, argv, v_flag);
     }
 
