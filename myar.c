@@ -355,6 +355,8 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
     struct ar_hdr header;
     char buf[SARMAG];
     char name[16];
+    int pos;
+    int argc_copy = argc;
 
     ar_fd = open(archive_name, O_RDONLY);
     if (ar_fd == -1) {
@@ -379,6 +381,7 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
     debug("archive size: %lu", st.st_size);
     while (position <= st.st_size-1) {
         offset = 0;
+        pos = 0;
         // Read the header into our struct
         num_read = read(ar_fd, &header, AR_HDR_SIZE);
         debug("header num_read %d", num_read);
@@ -410,7 +413,14 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
              * otherwise check if the file we're at in the archive is one of
              * the specified files to extract
              */
-            if ((index == argc) || (is_in_args(name, index, argc, argv))) {
+            pos = is_in_args(name, index, argc, argv);
+            if ((index == argc_copy) || (pos != 0)) {
+                // prevents extracting files of the same name more than once.
+                if (pos) {
+                    argv[pos] = argv[argc-1];
+                    argc--;
+                }
+
                 debug("extracting file %s", name);
                 offset = extract_file(ar_fd, header, verbose);
                 if (offset == 0) // EOF
@@ -446,12 +456,16 @@ void read_archive(int index, int argc, char **argv, char flag, int verbose)
                 new_ar_fd = open_archive(archive_name, 0);
             }
             // If there were no args, so copy nothing
-            if (index == argc) {
+            if (index == argc_copy) {
                 debug("Deleting all");
                 return;
             }
             // If its in args, then we *dont* want to keep it.
-            if (is_in_args(name, index, argc, argv)) {
+            if ((pos = is_in_args(name, index, argc, argv)) != 0) {
+                // prevents 'deleting' (IE not copying)
+                // files of the same name // more than once.
+                argv[pos] = argv[argc-1];
+                argc--;
                 debug("Deleting file");
                 if (verbose)
                     printf("d - %s\n", name);
@@ -601,7 +615,7 @@ int is_in_args(char *name, int index, int argc, char **argv)
          * return 32 (ASCII for whitespace)
         */
         if (strncmp(name, buffer, strlen(argv[index])) == 0) {
-            found = 1;
+            found = index;
             break;
         }
         index++;
